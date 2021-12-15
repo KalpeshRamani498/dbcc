@@ -333,23 +333,40 @@ static int signal2scaling_encode(const char *msgname, unsigned id, signal_t *sig
 		bool gmin = true;
 
 		if (sig->is_signed) {
-			gmin = sig->minimum > signed_min(sig);
-			gmax = sig->maximum < signed_max(sig);
+			if((8 == sig->bit_length) || (16 == sig->bit_length) || (32 == sig->bit_length) || (64 == sig->bit_length)) {
+				gmin = sig->minimum > signed_min(sig);
+				gmax = sig->maximum < signed_max(sig);
+			} else {
+				gmin = sig->minimum > signed_min(sig);
+				gmax = sig->maximum <= signed_max(sig);
+			}
 		} else {
-			gmin = sig->minimum > 0.0;
-			gmax = sig->maximum < unsigned_max(sig);
+			if((8 == sig->bit_length) || (16 == sig->bit_length) || (32 == sig->bit_length) || (64 == sig->bit_length)) {
+				gmin = sig->minimum > 0.0;
+				gmax = sig->maximum < unsigned_max(sig);
+			} else {
+				gmin = sig->minimum > 0.0;
+				gmax = sig->maximum <= unsigned_max(sig);
+			}
 		}
 		if (sig->is_floating) {
-			gmax = true;
+			gmin = true;
 			gmax = true;
 		}
 
-		if (gmin || gmax)
-			fprintf(o, "\to->%s.%s = 0;\n", msgname, sig->name); // cast!
-		if (gmin)
-			fprintf(o, "\tif (in < %g)\n\t\treturn -1;\n", sig->minimum);
-		if (gmax)
-			fprintf(o, "\tif (in > %g)\n\t\treturn -1;\n", sig->maximum);
+		if (gmin && gmax) {
+			fprintf(o, "\tif ((in < %g) && (in > %g)) {\n", sig->minimum, sig->maximum);
+			fprintf(o, "\t\to->%s.%s = 0;\n", msgname, sig->name); // cast!
+			fprintf(o, "\t\treturn -1;\n\t}\n");
+		} else if (gmin) {
+			fprintf(o, "\tif (in < %g {\n", sig->minimum);
+			fprintf(o, "\t\to->%s.%s = 0;\n", msgname, sig->name); // cast!
+			fprintf(o, "\t\treturn -1;\n\t}\n");
+		} else if (gmax) {
+			fprintf(o, "\tif (in > %g) {\n", sig->maximum);
+			fprintf(o, "\t\to->%s.%s = 0;\n", msgname, sig->name); // cast!
+			fprintf(o, "\t\treturn -1;\n\t}\n");
+		}
 	}
 
 	if (sig->scaling == 0.0)
@@ -394,14 +411,24 @@ static int signal2scaling_decode(const char *msgname, unsigned id, signal_t *sig
 		bool gmin = true;
 
 		if (sig->is_signed) { /**@warning comparison may fail because of limits of double size */
-			gmin = sig->minimum > signed_min(sig);
-			gmax = sig->maximum < signed_max(sig);
+			if((8 == sig->bit_length) || (16 == sig->bit_length) || (32 == sig->bit_length) || (64 == sig->bit_length)) {
+				gmin = sig->minimum > signed_min(sig);
+				gmax = sig->maximum < signed_max(sig);
+			} else {
+				gmin = sig->minimum > signed_min(sig);
+				gmax = sig->maximum <= signed_max(sig);
+			}
 		} else {
-			gmin = sig->minimum > 0.0;
-			gmax = sig->maximum < unsigned_max(sig);
+			if((8 == sig->bit_length) || (16 == sig->bit_length) || (32 == sig->bit_length) || (64 == sig->bit_length)) {
+				gmin = sig->minimum > 0.0;
+				gmax = sig->maximum < unsigned_max(sig);
+			} else {
+				gmin = sig->minimum > 0.0;
+				gmax = sig->maximum <= unsigned_max(sig);
+			}
 		}
 		if (sig->is_floating) {
-			gmax = true;
+			gmin = true;
 			gmax = true;
 		}
 
